@@ -2,9 +2,15 @@ jQuery(document).ready(function($) {
     let queue = [];
     let current = 0;
 
-    /**
-     * Manual Run: Step-by-step, no email
-     */
+    // Append log with color and optional timestamp
+    function appendLog(plugin, status, timestamp = null) {
+        let color = status.includes("✅") ? "green" : status.includes("❌") ? "red" : "orange";
+        let timeText = timestamp ? " (Last Updated: " + timestamp + ")" : "";
+        $('#update-log').append('<li style="color:' + color + '">' + plugin + ': ' + status + timeText + '</li>');
+        $('#update-log').scrollTop($('#update-log')[0].scrollHeight);
+    }
+
+    // Run updates (no email)
     $('#run-updates').on('click', function(e) {
         e.preventDefault();
         $.post(SeqUpdater.ajaxurl, {
@@ -16,15 +22,11 @@ jQuery(document).ready(function($) {
                 current = 0;
                 $('#update-log').empty();
                 runNext();
-            } else {
-                alert("No saved plugins found.");
-            }
+            } else alert("No saved plugins found.");
         });
     });
 
-    /**
-     * Manual Run: All at once, then send email
-     */
+    // Run updates + email
     $('#run-updates-email').on('click', function(e) {
         e.preventDefault();
         $('#update-log').empty().append('<li>⏳ Running updates + sending email...</li>');
@@ -36,35 +38,34 @@ jQuery(document).ready(function($) {
             if (res.success) {
                 $('#update-log').append('<li>✅ Updates complete. Email sent.</li>');
                 $.each(res.data, function(plugin, status) {
-                    $('#update-log').append('<li>' + plugin + ': ' + status + '</li>');
+                    let timestamp = new Date().toLocaleString();
+                    appendLog(plugin, status, timestamp);
                 });
             } else {
-                $('#update-log').append('<li>❌ ' + res.data + '</li>');
+                $('#update-log').append('<li style="color:red">❌ ' + res.data + '</li>');
             }
         });
     });
 
-    /**
-     * Helper - update plugins sequentially (step-by-step mode)
-     */
+    // Run next plugin in queue
     function runNext() {
         if (current >= queue.length) {
-            $('#update-log').append('<li>✅ All updates finished.</li>');
+            $('#update-log').append('<li style="color:green">✅ All updates finished.</li>');
             return;
         }
+
         let plugin = queue[current];
-        $('#update-log').append('<li>⏳ Updating ' + plugin + '...</li>');
+        $('#update-log').append('<li style="color:orange">⏳ Updating ' + plugin + '...</li>');
 
         $.post(SeqUpdater.ajaxurl, {
             action: 'seq_update_plugin',
             nonce: SeqUpdater.nonce,
             plugin: plugin
         }, function(res) {
-            if (res.success) {
-                $('#update-log').append('<li>' + plugin + ': ' + res.data.status + '</li>');
-            } else {
-                $('#update-log').append('<li>' + plugin + ': ❌ Failed</li>');
-            }
+            let timestamp = new Date().toLocaleString();
+            if (res.success) appendLog(plugin, res.data.status, timestamp);
+            else appendLog(plugin, "❌ Failed", timestamp);
+
             current++;
             runNext();
         });
